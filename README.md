@@ -30,3 +30,12 @@ python main.py
 
 ✅ You’ll be prompted for a stock symbol
 ✅ You’ll get back the latest 10-Q index URL from EDGAR
+
+
+---
+
+## 🧾 What it Does So Far
+
+- Converts a stock symbol (e.g. AAPL) to a CIK
+- Fetches the latest 10-Q filing index for that company
+- Extracts the actual URL of the HTML 10-Q report

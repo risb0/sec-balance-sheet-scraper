@@ -40,12 +40,31 @@ def get_latest_10q_url(cik: str) -> str:
 def fetch_and_parse_latest_10q(symbol: str):
     cik = get_cik_from_symbol(symbol)
     print(f"Found CIK for {symbol}: {cik}")
-    
+
     try:
-        filing_url = get_latest_10q_url(cik)
-        print(f"Latest 10-Q filing index URL:\n{filing_url}")
-    except LookupError as e:
-        print(str(e))
-    
+        index_url = get_latest_10q_url(cik)
+        print(f"Filing index URL:\n{index_url}")
+
+        html_url = get_10q_html_url(index_url)
+        print(f"\n✅ Found 10-Q HTML document:\n{html_url}")
+
+    except (LookupError, requests.RequestException) as e:
+        print(f"Error: {e}")
+
     # Respect SEC rate limit
     time.sleep(0.5)
+
+
+def get_10q_html_url(index_url: str) -> str:
+    """Extract the main 10-Q filing HTML URL from the index.json."""
+    response = requests.get(index_url, headers=HEADERS)
+    response.raise_for_status()
+    data = response.json()
+
+    for file in data.get("directory", {}).get("item", []):
+        name = file.get("name", "").lower()
+        if name.endswith(".htm") and "10q" in name:
+            html_url = index_url.replace("index.json", name)
+            return html_url
+
+    raise LookupError("10-Q HTML file not found in filing index.")
