@@ -1,8 +1,9 @@
 import requests
 import time
+from bs4 import BeautifulSoup
 
 HEADERS = {
-    "User-Agent": "Your Name your.email@example.com"
+    "User-Agent": "rizsbosz@atomicmail.io"
 }
 
 TICKER_CIK_URL = "https://www.sec.gov/files/company_tickers.json"
@@ -48,11 +49,18 @@ def fetch_and_parse_latest_10q(symbol: str):
         html_url = get_10q_html_url(index_url)
         print(f"\n✅ Found 10-Q HTML document:\n{html_url}")
 
+        balance_sheet_html = extract_balance_sheet_table(html_url)
+        with open("balance_sheet.html", "w", encoding="utf-8") as f:
+            f.write(balance_sheet_html)
+        print("\n✅ Saved extracted table to balance_sheet.html")
+
     except (LookupError, requests.RequestException) as e:
         print(f"Error: {e}")
 
     # Respect SEC rate limit
     time.sleep(0.5)
+
+    
 
 
 def get_10q_html_url(index_url: str) -> str:
@@ -68,3 +76,22 @@ def get_10q_html_url(index_url: str) -> str:
             return html_url
 
     raise LookupError("10-Q HTML file not found in filing index.")
+
+
+
+
+def extract_balance_sheet_table(html_url: str) -> str:
+    """Extract the Condensed Consolidated Balance Sheets table from the 10-Q HTML."""
+    response = requests.get(html_url, headers=HEADERS)
+    response.raise_for_status()
+    soup = BeautifulSoup(response.content, "html.parser")
+
+    # Find all tables that contain the string "Condensed Consolidated Balance Sheets"
+    tables = soup.find_all("table")
+
+    for table in tables:
+        if "Condensed Consolidated Balance Sheets" in table.get_text():
+            print("\n✅ Found Condensed Consolidated Balance Sheets table")
+            return table.prettify()
+
+    raise LookupError("Could not find 'Condensed Consolidated Balance Sheets' table in filing.")
