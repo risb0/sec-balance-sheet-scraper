@@ -47,12 +47,12 @@ def fetch_and_parse_latest_10q(symbol: str):
         print(f"Filing index URL:\n{index_url}")
 
         html_url = get_10q_html_url(index_url)
-        print(f"\n✅ Found 10-Q HTML document:\n{html_url}")
+        print(f"\n Found 10-Q HTML document:\n{html_url}")
 
         balance_sheet_html = extract_balance_sheet_table(html_url)
         with open("balance_sheet.html", "w", encoding="utf-8") as f:
             f.write(balance_sheet_html)
-        print("\n✅ Saved extracted table to balance_sheet.html")
+        print("\n Saved extracted table to balance_sheet.html")
 
     except (LookupError, requests.RequestException) as e:
         print(f"Error: {e}")
@@ -64,18 +64,29 @@ def fetch_and_parse_latest_10q(symbol: str):
 
 
 def get_10q_html_url(index_url: str) -> str:
-    """Extract the main 10-Q filing HTML URL from the index.json."""
+    """Finds the most likely 10-Q HTML file from index.json (fallback = largest .htm)."""
     response = requests.get(index_url, headers=HEADERS)
     response.raise_for_status()
     data = response.json()
-
+    
+    htm_files = []
     for file in data.get("directory", {}).get("item", []):
         name = file.get("name", "").lower()
-        if name.endswith(".htm") and "10q" in name:
-            html_url = index_url.replace("index.json", name)
-            return html_url
+        size = int(file.get("size", "0")) if file.get("size", "").isdigit() else 0
+        if name.endswith(".htm"):
+            htm_files.append((name, size))
 
-    raise LookupError("10-Q HTML file not found in filing index.")
+    if not htm_files:
+        raise LookupError("No HTML files found in filing index.")
+
+    # Prefer file with "10-q" in the name
+    for name, _ in htm_files:
+        if "10-q" in name or "10q" in name:
+            return index_url.replace("index.json", name)
+
+    # Fallback to largest .htm file (likely the main report)
+    name, _ = max(htm_files, key=lambda x: x[1])
+    return index_url.replace("index.json", name)
 
 
 
@@ -91,7 +102,7 @@ def extract_balance_sheet_table(html_url: str) -> str:
 
     for table in tables:
         if "Condensed Consolidated Balance Sheets" in table.get_text():
-            print("\n✅ Found Condensed Consolidated Balance Sheets table")
+            print("\n Found Condensed Consolidated Balance Sheets table")
             return table.prettify()
 
     raise LookupError("Could not find 'Condensed Consolidated Balance Sheets' table in filing.")
