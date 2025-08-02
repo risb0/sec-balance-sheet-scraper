@@ -9,11 +9,23 @@ def main():
 
     fetch_and_parse_latest_10q(symbol)
 
-    rows = parse_balance_sheet_html("balance_sheet.html")
-    print(f"\n✅ Parsed {len(rows)} rows from balance sheet")
+    try:
+        with open("balance_sheet.html", "r", encoding="utf-8") as f:
+            html_content = f.read()
+    except FileNotFoundError:
+        print("Error: balance_sheet.html not found. Exiting.")
+        return
+
+    rows = parse_balance_sheet_html("balance_sheet.html", symbol)
+
+    if not rows:
+        print("Error: Could not parse balance sheet rows.")
+        return
+
+    print(f"\nParsed {len(rows)} rows from balance sheet")
 
     insert_balance_sheet_rows(symbol, rows)
-    print("✅ Inserted into database")
+    print("Inserted into database")
 
 if __name__ == "__main__":
     main()

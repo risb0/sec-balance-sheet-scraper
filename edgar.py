@@ -1,9 +1,12 @@
 import requests
 import time
 from bs4 import BeautifulSoup
+from parser import parse_balance_sheet_html
+import re
+from parser import parse_balance_sheet_html_string
 
 HEADERS = {
-    "User-Agent": "rizsbosz@atomicmail.io"
+    "User-Agent": "rizsbosz@atomicmail.io SEC scraper for educational project"
 }
 
 TICKER_CIK_URL = "https://www.sec.gov/files/company_tickers.json"
@@ -46,63 +49,88 @@ def fetch_and_parse_latest_10q(symbol: str):
         index_url = get_latest_10q_url(cik)
         print(f"Filing index URL:\n{index_url}")
 
-        html_url = get_10q_html_url(index_url)
-        print(f"\n Found 10-Q HTML document:\n{html_url}")
+        html_url = get_10q_html_url(index_url, symbol)
+        print(f"\nFound 10-Q HTML document:\n{html_url}")
 
+        # Save full 10-Q HTML for reference
+        html_response = requests.get(html_url, headers=HEADERS)
+        html_response.raise_for_status()
+        with open("full_10q.html", "w", encoding="utf-8") as f:
+            f.write(html_response.text)
+
+        # Extract just the balance sheet section as HTML
         balance_sheet_html = extract_balance_sheet_table(html_url)
-        with open("balance_sheet.html", "w", encoding="utf-8") as f:
-            f.write(balance_sheet_html)
-        print("\n Saved extracted table to balance_sheet.html")
+
+        if balance_sheet_html:
+            with open("balance_sheet.html", "w", encoding="utf-8") as f:
+                f.write(balance_sheet_html)
+            print("Saved balance sheet HTML to balance_sheet.html")
+        else:
+            print("Skipping save: No balance sheet HTML extracted.")
+            return
 
     except (LookupError, requests.RequestException) as e:
         print(f"Error: {e}")
 
-    # Respect SEC rate limit
-    time.sleep(0.5)
+    time.sleep(0.5)  # Respect SEC rate limit
+
+
+
 
     
 
 
-def get_10q_html_url(index_url: str) -> str:
-    """Finds the most likely 10-Q HTML file from index.json (fallback = largest .htm)."""
+def get_10q_html_url(index_url: str, symbol: str) -> str:
+    """Return the most likely 10-Q HTML document URL from the index."""
     response = requests.get(index_url, headers=HEADERS)
     response.raise_for_status()
     data = response.json()
-    
-    htm_files = []
-    for file in data.get("directory", {}).get("item", []):
+
+    items = data.get("directory", {}).get("item", [])
+    symbol_lower = symbol.lower()
+
+    # Priority 1: Match pattern like "aapl-20250329.htm"
+    for file in items:
         name = file.get("name", "").lower()
-        size = int(file.get("size", "0")) if file.get("size", "").isdigit() else 0
-        if name.endswith(".htm"):
-            htm_files.append((name, size))
+        if re.match(rf"^{symbol_lower}-\d{{8}}\.htm$", name):
+            return index_url.replace("index.json", file["name"])
 
-    if not htm_files:
-        raise LookupError("No HTML files found in filing index.")
+    # Priority 2: Fall back to first .htm file with '10-q' or '10q'
+    for file in items:
+        name = file.get("name", "").lower()
+        if "10-q" in name or "10q" in name and name.endswith(".htm"):
+            return index_url.replace("index.json", file["name"])
 
-    # Prefer file with "10-q" in the name
-    for name, _ in htm_files:
-        if "10-q" in name or "10q" in name:
-            return index_url.replace("index.json", name)
+    # Priority 3: Fall back to largest .htm file
+    html_files = [f for f in items if f["name"].lower().endswith(".htm")]
+    if html_files:
+        largest = max(html_files, key=lambda f: f.get("size", 0))
+        return index_url.replace("index.json", largest["name"])
 
-    # Fallback to largest .htm file (likely the main report)
-    name, _ = max(htm_files, key=lambda x: x[1])
-    return index_url.replace("index.json", name)
+    raise LookupError("No suitable 10-Q HTML file found.")
+
 
 
 
 
 def extract_balance_sheet_table(html_url: str) -> str:
-    """Extract the Condensed Consolidated Balance Sheets table from the 10-Q HTML."""
+    """Extracts the Balance Sheet section from the 10-Q HTML."""
     response = requests.get(html_url, headers=HEADERS)
     response.raise_for_status()
     soup = BeautifulSoup(response.content, "html.parser")
 
-    # Find all tables that contain the string "Condensed Consolidated Balance Sheets"
     tables = soup.find_all("table")
 
-    for table in tables:
-        if "Condensed Consolidated Balance Sheets" in table.get_text():
-            print("\n Found Condensed Consolidated Balance Sheets table")
-            return table.prettify()
+    for i, table in enumerate(tables):
+        text = table.get_text(" ", strip=True).lower()
+        print(f"Table {i} preview: {text[:100].encode('ascii', errors='ignore').decode()}...")
 
-    raise LookupError("Could not find 'Condensed Consolidated Balance Sheets' table in filing.")
+        # Heuristic: Balance sheet likely contains "assets" and two distinct 4-digit years
+        if "assets" in text:
+            years = set(re.findall(r"\b20\d{2}\b", text))
+            if len(years) >= 2:
+                print(f"Found candidate balance sheet table at index {i}")
+                return table.prettify()
+
+    print("No matching balance sheet table found.")
+    return None
