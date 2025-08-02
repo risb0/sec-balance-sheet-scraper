@@ -11,5 +11,5 @@ cd sec-balance-sheet-scraper
 # Install dependencies
 pip install -r requirements.txt
 
-# Run the script
+# Run the program
 python main.py

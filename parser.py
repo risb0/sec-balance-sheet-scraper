@@ -1,21 +1,26 @@
 from bs4 import BeautifulSoup
 
-def parse_balance_sheet_html(filepath: str) -> list[dict]:
-    """Parses balance_sheet.html into a list of row dictionaries."""
-    with open(filepath, "r", encoding="utf-8") as f:
-        soup = BeautifulSoup(f, "html.parser")
+import re
+from bs4 import BeautifulSoup
+from typing import Optional
 
-    table = soup.find("table")
-    rows = table.find_all("tr")
+def parse_balance_sheet_html(html_content: str) -> Optional[str]:
+    soup = BeautifulSoup(html_content, 'html.parser')
+    tables = soup.find_all('table')
 
-    headers = [th.get_text(strip=True) for th in rows[0].find_all(["th", "td"])]
-    data_rows = []
+    for table in tables:
+        table_text = table.get_text(separator=' ', strip=True).lower()
 
-    for row in rows[1:]:
-        cells = row.find_all(["th", "td"])
-        values = [cell.get_text(strip=True) for cell in cells]
-        if values:
-            entry = dict(zip(headers, values))
-            data_rows.append(entry)
+        # Look for common patterns in balance sheet tables
+        if (
+            "condensed consolidated balance sheets" in table_text
+            or "consolidated balance sheets" in table_text
+        ):
+            print("\nFound a candidate balance sheet table. Preview:\n")
+            preview = table_text[:500] + "..." if len(table_text) > 500 else table_text
+            print(preview)
+            return table.prettify()
 
-    return data_rows
+    print("No matching balance sheet table found.")
+    return None
+
