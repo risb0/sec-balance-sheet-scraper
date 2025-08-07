@@ -1,4 +1,15 @@
+# Python cache
 __pycache__/
 *.pyc
-*.sqlite
-.env
+
+# Local HTML dumps
+full_10q.html
+balance_sheet.html
+
+# Local DBs or CSVs
+*.db
+*.csv
+*.json
+
+# VSCode
+.vscode/
