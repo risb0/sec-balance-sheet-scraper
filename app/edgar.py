@@ -113,4 +113,3 @@ def fetch_and_parse_latest_10q(symbol: str):
         print(f"Error: {e}")
 
     time.sleep(0.5)
-
