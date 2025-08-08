@@ -1,21 +1,26 @@
-from pymongo import MongoClient
+# app/mongo_utils.py
+
 import os
+from pymongo import MongoClient
 
-MONGO_HOST = os.getenv("MONGO_HOST", "mongo")
-MONGO_PORT = int(os.getenv("MONGO_PORT", 27017))
-MONGO_DB = os.getenv("MONGO_DB", "sec_data")
-MONGO_COLLECTION = os.getenv("MONGO_COLLECTION", "balance_sheets")
-
-client = None
+_client = None
 
 def init_db():
-    global client
-    if not client:
-        client = MongoClient(host=MONGO_HOST, port=MONGO_PORT)
-    return client[MONGO_DB][MONGO_COLLECTION]
+    global _client
+    mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+    _client = MongoClient(mongo_uri)
+    print("MongoDB client initialized.")
 
 def insert_balance_sheet_rows(symbol, rows):
-    collection = init_db()
-    collection.delete_many({"symbol": symbol})  # Avoid duplicates
-    collection.insert_many(rows)
-    print(f"Inserted {len(rows)} rows into MongoDB for {symbol}")
+    if not _client:
+        raise RuntimeError("MongoDB client not initialized. Call init_db() first.")
+
+    db = _client["sec_scraper"]
+    collection = db["balance_sheets"]
+
+    # Tag each row with the symbol again (even if already tagged)
+    for row in rows:
+        row["symbol"] = symbol
+
+    result = collection.insert_many(rows)
+    print(f"Inserted {len(result.inserted_ids)} documents for {symbol} into MongoDB.")
