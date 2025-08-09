@@ -8,26 +8,33 @@ def process_symbol(symbol):
     print(f"\nProcessing {symbol}...")
 
     try:
-        fetch_and_parse_latest_10q(symbol)
+        result = fetch_and_parse_latest_10q(symbol)
+        if not result:
+            print(f"Failed to fetch and parse latest 10-Q for {symbol}")
+            return
+        html_path, filing_date = result  # unpack safely now
 
         try:
-            with open("balance_sheet.html", "r", encoding="utf-8") as f:
+            with open(html_path, "r", encoding="utf-8") as f:
                 html_content = f.read()
         except FileNotFoundError:
-            print("balance_sheet.html not found.")
+            print(f"{html_path} not found.")
             return
 
-        rows = parse_balance_sheet_html("balance_sheet.html", symbol)
+        rows = parse_balance_sheet_html(html_path, symbol, filing_date)
+
 
         if not rows:
             print("No rows extracted for", symbol)
             return
 
-        insert_balance_sheet_rows(symbol, rows)
+        insert_balance_sheet_rows(symbol, rows, filing_date)
         print(f"Inserted {len(rows)} rows into MongoDB for {symbol}")
 
     except Exception as e:
         print(f"Error processing {symbol}: {e}")
+
+
 
 def main():
     init_db()

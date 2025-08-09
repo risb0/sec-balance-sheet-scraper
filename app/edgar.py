@@ -87,9 +87,32 @@ def fetch_and_parse_latest_10q(symbol: str):
     cik = get_cik_from_symbol(symbol)
     print(f"Found CIK for {symbol}: {cik}")
 
+    filing_date = None  # Add this to track filing date
+
     try:
         index_url = get_latest_10q_url(cik)
         print(f"Filing index URL:\n{index_url}")
+
+        # Extract filing date from the index JSON (add this)
+        index_response = requests.get(index_url, headers=HEADERS)
+        index_response.raise_for_status()
+        index_data = index_response.json()
+
+        # Extract filing date from index_data - for example, the accessionNumber date or filingDate field
+        filing_dates = index_data.get("directory", {}).get("item", [])
+        # The index JSON does not have a direct filing date field; so instead, get from filings recent data:
+        submissions_url = SUBMISSIONS_URL.format(cik=cik)
+        submissions_response = requests.get(submissions_url, headers=HEADERS)
+        submissions_response.raise_for_status()
+        submissions_data = submissions_response.json()
+
+        # Find the filing date for the latest 10-Q
+        forms = submissions_data["filings"]["recent"]["form"]
+        dates = submissions_data["filings"]["recent"]["filingDate"]
+        for form, date in zip(forms, dates):
+            if form == "10-Q":
+                filing_date = date
+                break
 
         html_url = get_10q_html_url(index_url, symbol)
         print(f"\nFound 10-Q HTML document:\n{html_url}")
@@ -105,11 +128,14 @@ def fetch_and_parse_latest_10q(symbol: str):
             with open("balance_sheet.html", "w", encoding="utf-8") as f:
                 f.write(balance_sheet_html)
             print(f"Saved balance sheet table {table_index} to balance_sheet.html")
+            return "balance_sheet.html", filing_date  # Return both here
         else:
             print("Skipping save: No balance sheet HTML extracted.")
-            return
+            return None
 
     except (LookupError, requests.RequestException) as e:
         print(f"Error: {e}")
+        return None
+
 
     time.sleep(0.5)
