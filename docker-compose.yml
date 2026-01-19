@@ -9,7 +9,7 @@ services:
       - MONGO_URI=mongodb://mongodb:27017
     volumes:
       - ./data:/app/data
-
+      - ./debug:/app/debug   # <-- NEW: debug folder on host
   mongodb:
     image: mongo:6
     restart: always
