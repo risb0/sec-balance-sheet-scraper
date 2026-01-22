@@ -41,5 +41,8 @@ def main():
     for symbol in SYMBOLS:
         process_symbol(symbol)
 
+    while True:
+        wait = 0
+
 if __name__ == "__main__":
     main()

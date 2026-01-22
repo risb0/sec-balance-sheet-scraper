@@ -8,4 +8,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ .
 
-CMD ["python", "batch_run.py"]
+CMD ["sh", "start_cmd.sh"]
