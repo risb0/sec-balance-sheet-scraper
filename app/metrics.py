@@ -1,7 +1,7 @@
 from pymongo import MongoClient
 from collections import defaultdict
 
-MONGO_URI = "mongodb://mongo:27017"
+MONGO_URI = "mongodb://mongodb:27017"
 DB_NAME = "sec_scraper"
 
 BALANCE_SHEET_COLLECTION = "balance_sheets"
